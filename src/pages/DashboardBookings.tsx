@@ -23,16 +23,18 @@ import { format } from 'date-fns';
 import type { Tables, Database } from '@/integrations/supabase/types';
 
 type BookingStatus = Database['public']['Enums']['booking_status'];
-type Booking = Tables<'bookings'> & {
-  services: { title: string; image_url: string | null; category: string; location: string | null } | null;
-  customer: { full_name: string; email: string } | null;
-  provider: { full_name: string; email: string } | null;
-};
+type Booking = Tables<'bookings'>;
+
+interface BookingWithDetails extends Booking {
+  service?: { title: string; image_url: string | null; category: string; location: string | null } | null;
+  customerProfile?: { full_name: string; email: string } | null;
+  providerProfile?: { full_name: string; email: string } | null;
+}
 
 export default function DashboardBookings() {
-  const { user, isProvider, loading: authLoading } = useAuth();
+  const { user, isProvider, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
 
@@ -44,18 +46,35 @@ export default function DashboardBookings() {
 
   const fetchBookings = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: bookingsData, error } = await supabase
         .from('bookings')
-        .select(`
-          *,
-          services(title, image_url, category, location),
-          customer:customer_id(full_name, email),
-          provider:provider_id(full_name, email)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setBookings((data as Booking[]) || []);
+
+      if (bookingsData && bookingsData.length > 0) {
+        const serviceIds = [...new Set(bookingsData.map(b => b.service_id))];
+        const customerIds = [...new Set(bookingsData.map(b => b.customer_id))];
+        const providerIds = [...new Set(bookingsData.map(b => b.provider_id))];
+
+        const [servicesRes, customersRes, providersRes] = await Promise.all([
+          supabase.from('services').select('id, title, image_url, category, location').in('id', serviceIds),
+          supabase.from('profiles').select('id, full_name, email').in('id', customerIds),
+          supabase.from('profiles').select('id, full_name, email').in('id', providerIds),
+        ]);
+
+        const bookingsWithDetails = bookingsData.map(booking => ({
+          ...booking,
+          service: servicesRes.data?.find(s => s.id === booking.service_id) || null,
+          customerProfile: customersRes.data?.find(p => p.id === booking.customer_id) || null,
+          providerProfile: providersRes.data?.find(p => p.id === booking.provider_id) || null,
+        }));
+
+        setBookings(bookingsWithDetails);
+      } else {
+        setBookings([]);
+      }
     } catch (error) {
       console.error('Error fetching bookings:', error);
     } finally {
@@ -173,7 +192,7 @@ export default function DashboardBookings() {
                 <div className="space-y-4">
                   {filteredBookings.map((booking, index) => {
                     const category = SERVICE_CATEGORIES.find(
-                      (c) => c.value === booking.services?.category
+                      (c) => c.value === booking.service?.category
                     );
                     return (
                       <motion.div
@@ -195,18 +214,18 @@ export default function DashboardBookings() {
                                 <div className="flex flex-wrap items-start justify-between gap-2">
                                   <div>
                                     <h3 className="font-semibold text-lg">
-                                      {booking.services?.title || 'Unknown Service'}
+                                      {booking.service?.title || 'Unknown Service'}
                                     </h3>
                                     <p className="text-sm text-muted-foreground">
                                       {isProvider ? (
                                         <>
                                           <User className="h-3 w-3 inline mr-1" />
-                                          {booking.customer?.full_name} ({booking.customer?.email})
+                                          {booking.customerProfile?.full_name} ({booking.customerProfile?.email})
                                         </>
                                       ) : (
                                         <>
                                           <User className="h-3 w-3 inline mr-1" />
-                                          Provider: {booking.provider?.full_name}
+                                          Provider: {booking.providerProfile?.full_name}
                                         </>
                                       )}
                                     </p>
@@ -227,10 +246,10 @@ export default function DashboardBookings() {
                                       {booking.scheduled_time}
                                     </span>
                                   )}
-                                  {booking.services?.location && (
+                                  {booking.service?.location && (
                                     <span className="flex items-center gap-1">
                                       <MapPin className="h-4 w-4" />
-                                      {booking.services.location}
+                                      {booking.service.location}
                                     </span>
                                   )}
                                   <span className="flex items-center gap-1 font-medium text-foreground">

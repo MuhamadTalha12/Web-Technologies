@@ -24,8 +24,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const { error } = await signIn(email, password);
-      if (error) throw error;
+      await signIn(email, password);
       
       toast({
         title: 'Welcome back!',
@@ -73,12 +72,6 @@ export default function Login() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="password">Password</Label>
-                    <Link
-                      to="/forgot-password"
-                      className="text-sm text-primary hover:underline"
-                    >
-                      Forgot password?
-                    </Link>
                   </div>
                   <div className="relative">
                     <Input

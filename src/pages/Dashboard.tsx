@@ -13,15 +13,17 @@ import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import type { Tables } from '@/integrations/supabase/types';
 
-type Booking = Tables<'bookings'> & {
-  services: { title: string; image_url: string | null; category: string } | null;
-  customer: { full_name: string } | null;
-  provider: { full_name: string } | null;
-};
+type Booking = Tables<'bookings'>;
+
+interface BookingWithDetails extends Booking {
+  service?: { title: string; image_url: string | null; category: string } | null;
+  customerProfile?: { full_name: string } | null;
+  providerProfile?: { full_name: string } | null;
+}
 
 export default function Dashboard() {
-  const { user, profile, isProvider, loading: authLoading } = useAuth();
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const { user, profile, isProvider, isLoading: authLoading } = useAuth();
+  const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
   const [stats, setStats] = useState({ totalBookings: 0, pendingBookings: 0, completedBookings: 0 });
   const [loading, setLoading] = useState(true);
 
@@ -33,29 +35,41 @@ export default function Dashboard() {
 
   const fetchBookings = async () => {
     try {
-      const query = supabase
+      const { data: bookingsData, error } = await supabase
         .from('bookings')
-        .select(`
-          *,
-          services(title, image_url, category),
-          customer:customer_id(full_name),
-          provider:provider_id(full_name)
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(5);
 
-      const { data, error } = await query;
-
       if (error) throw error;
-      setBookings((data as Booking[]) || []);
 
-      // Calculate stats
-      const allBookings = data || [];
-      setStats({
-        totalBookings: allBookings.length,
-        pendingBookings: allBookings.filter((b) => b.status === 'pending').length,
-        completedBookings: allBookings.filter((b) => b.status === 'completed').length,
-      });
+      // Fetch related data
+      if (bookingsData && bookingsData.length > 0) {
+        const serviceIds = [...new Set(bookingsData.map(b => b.service_id))];
+        const customerIds = [...new Set(bookingsData.map(b => b.customer_id))];
+        const providerIds = [...new Set(bookingsData.map(b => b.provider_id))];
+
+        const [servicesRes, customersRes, providersRes] = await Promise.all([
+          supabase.from('services').select('id, title, image_url, category').in('id', serviceIds),
+          supabase.from('profiles').select('id, full_name').in('id', customerIds),
+          supabase.from('profiles').select('id, full_name').in('id', providerIds),
+        ]);
+
+        const bookingsWithDetails = bookingsData.map(booking => ({
+          ...booking,
+          service: servicesRes.data?.find(s => s.id === booking.service_id) || null,
+          customerProfile: customersRes.data?.find(p => p.id === booking.customer_id) || null,
+          providerProfile: providersRes.data?.find(p => p.id === booking.provider_id) || null,
+        }));
+
+        setBookings(bookingsWithDetails);
+
+        setStats({
+          totalBookings: bookingsData.length,
+          pendingBookings: bookingsData.filter((b) => b.status === 'pending').length,
+          completedBookings: bookingsData.filter((b) => b.status === 'completed').length,
+        });
+      }
     } catch (error) {
       console.error('Error fetching bookings:', error);
     } finally {
@@ -211,7 +225,7 @@ export default function Dashboard() {
                 <div className="space-y-4">
                   {bookings.map((booking) => {
                     const category = SERVICE_CATEGORIES.find(
-                      (c) => c.value === booking.services?.category
+                      (c) => c.value === booking.service?.category
                     );
                     return (
                       <div
@@ -223,12 +237,12 @@ export default function Dashboard() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">
-                            {booking.services?.title || 'Unknown Service'}
+                            {booking.service?.title || 'Unknown Service'}
                           </p>
                           <p className="text-sm text-muted-foreground">
                             {isProvider
-                              ? `Customer: ${booking.customer?.full_name}`
-                              : `Provider: ${booking.provider?.full_name}`}
+                              ? `Customer: ${booking.customerProfile?.full_name || 'Unknown'}`
+                              : `Provider: ${booking.providerProfile?.full_name || 'Unknown'}`}
                           </p>
                         </div>
                         <div className="text-right shrink-0">

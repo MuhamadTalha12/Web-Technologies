@@ -2,10 +2,16 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { ServiceCard } from '@/components/services/ServiceCard';
-import { ServiceFilters } from '@/components/services/ServiceFilters';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { SERVICE_CATEGORIES, ITEMS_PER_PAGE } from '@/lib/constants';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
@@ -18,11 +24,10 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import type { Tables } from '@/integrations/supabase/types';
+import type { Tables, Database } from '@/integrations/supabase/types';
 
-type Service = Tables<'services'> & {
-  profiles?: { full_name: string; avatar_url: string | null } | null;
-};
+type ServiceCategory = Database['public']['Enums']['service_category'];
+type Service = Tables<'services'>;
 
 export default function Services() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -45,15 +50,15 @@ export default function Services() {
     try {
       let query = supabase
         .from('services')
-        .select('*, profiles!services_provider_id_fkey(full_name, avatar_url)', { count: 'exact' })
+        .select('*', { count: 'exact' })
         .eq('is_active', true);
 
       if (searchQuery) {
         query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
       }
 
-      if (category) {
-        query = query.eq('category', category);
+      if (category && SERVICE_CATEGORIES.some(c => c.value === category)) {
+        query = query.eq('category', category as ServiceCategory);
       }
 
       // Sorting
@@ -75,7 +80,7 @@ export default function Services() {
       const { data, error, count } = await query;
 
       if (error) throw error;
-      setServices((data as Service[]) || []);
+      setServices(data || []);
       setTotalCount(count || 0);
     } catch (error) {
       console.error('Error fetching services:', error);
@@ -159,12 +164,40 @@ export default function Services() {
             className="border-b border-border bg-background overflow-hidden"
           >
             <div className="container py-6">
-              <ServiceFilters
-                category={category}
-                sortBy={sortBy}
-                onCategoryChange={(val) => updateSearchParams('category', val)}
-                onSortChange={(val) => updateSearchParams('sort', val)}
-              />
+              <div className="flex flex-wrap gap-4">
+                <Select value={category || 'all'} onValueChange={(val) => updateSearchParams('category', val === 'all' ? '' : val)}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {SERVICE_CATEGORIES.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>
+                        {cat.icon} {cat.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={sortBy} onValueChange={(val) => updateSearchParams('sort', val)}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="created_at">Newest First</SelectItem>
+                    <SelectItem value="price_asc">Price: Low to High</SelectItem>
+                    <SelectItem value="price_desc">Price: High to Low</SelectItem>
+                    <SelectItem value="rating">Highest Rated</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {hasActiveFilters && (
+                  <Button variant="ghost" onClick={clearFilters}>
+                    <X className="h-4 w-4 mr-1" />
+                    Clear all
+                  </Button>
+                )}
+              </div>
             </div>
           </motion.div>
         )}

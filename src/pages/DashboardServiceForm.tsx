@@ -26,7 +26,7 @@ type ServiceCategory = Database['public']['Enums']['service_category'];
 export default function DashboardServiceForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, isProvider, loading: authLoading } = useAuth();
+  const { user, isProvider, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   
   const isEditing = id && id !== 'new';
@@ -38,7 +38,7 @@ export default function DashboardServiceForm() {
   const [durationHours, setDurationHours] = useState('');
   const [location, setLocation] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  const [loading, setLoading] = useState(isEditing);
+  const [loading, setLoading] = useState(!!isEditing);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
