@@ -20,7 +20,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { SERVICE_CATEGORIES } from '@/lib/constants';
-import { Plus, Edit, Trash2, Star, Eye, EyeOff } from 'lucide-react';
+import { seedDemoServices } from '@/lib/demo-data';
+import { Plus, Edit, Trash2, Star, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -31,6 +32,7 @@ export default function DashboardServices() {
   const { toast } = useToast();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
 
   useEffect(() => {
     if (user && isProvider) {
@@ -54,6 +56,30 @@ export default function DashboardServices() {
       console.error('Error fetching services:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSeedDemoData = async () => {
+    setSeeding(true);
+    try {
+      const success = await seedDemoServices(user!.id);
+      if (success) {
+        toast({
+          title: 'Demo data added!',
+          description: 'Sample services have been added to your account.',
+        });
+        fetchServices();
+      } else {
+        throw new Error('Failed to seed data');
+      }
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to add demo data',
+      });
+    } finally {
+      setSeeding(false);
     }
   };
 
@@ -154,12 +180,20 @@ export default function DashboardServices() {
             <h1 className="font-display text-3xl font-bold mb-2">My Services</h1>
             <p className="text-muted-foreground">Manage your service listings</p>
           </div>
-          <Button asChild>
-            <Link to="/dashboard/services/new">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Service
-            </Link>
-          </Button>
+          <div className="flex gap-3">
+            {services.length === 0 && (
+              <Button variant="outline" onClick={handleSeedDemoData} disabled={seeding}>
+                <Sparkles className="h-4 w-4 mr-2" />
+                {seeding ? 'Adding...' : 'Add Demo Services'}
+              </Button>
+            )}
+            <Button asChild>
+              <Link to="/dashboard/services/new">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Service
+              </Link>
+            </Button>
+          </div>
         </motion.div>
 
         {loading ? (
@@ -180,12 +214,18 @@ export default function DashboardServices() {
                 <p className="text-muted-foreground mb-6">
                   Start offering your services to customers
                 </p>
-                <Button asChild>
-                  <Link to="/dashboard/services/new">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Your First Service
-                  </Link>
-                </Button>
+                <div className="flex gap-3 justify-center">
+                  <Button variant="outline" onClick={handleSeedDemoData} disabled={seeding}>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    {seeding ? 'Adding...' : 'Add Demo Services'}
+                  </Button>
+                  <Button asChild>
+                    <Link to="/dashboard/services/new">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Your First Service
+                    </Link>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </motion.div>
@@ -205,6 +245,15 @@ export default function DashboardServices() {
                   transition={{ delay: index * 0.05 }}
                 >
                   <Card className={`relative ${!service.is_active ? 'opacity-60' : ''}`}>
+                    {service.image_url && (
+                      <div className="h-32 overflow-hidden rounded-t-lg">
+                        <img
+                          src={service.image_url}
+                          alt={service.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2">
@@ -225,7 +274,7 @@ export default function DashboardServices() {
                       {service.rating && service.rating > 0 && (
                         <div className="flex items-center gap-1 text-sm mb-4">
                           <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                          <span>{service.rating}</span>
+                          <span>{Number(service.rating).toFixed(1)}</span>
                           <span className="text-muted-foreground">
                             ({service.total_reviews} reviews)
                           </span>
