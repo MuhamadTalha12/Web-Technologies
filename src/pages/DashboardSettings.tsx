@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -6,12 +7,44 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { User, Briefcase, LogOut, Shield, Bell, Palette, Loader2 } from 'lucide-react';
+import { makeCurrentUserAdmin, hasAnyAdmin } from '@/lib/admin-utils';
+import { User, Briefcase, LogOut, Shield, Bell, Palette, Loader2, Crown } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function DashboardSettings() {
-  const { user, profile, isProvider, signOut, isLoading: authLoading } = useAuth();
+  const { user, profile, isProvider, isAdmin, signOut, refreshProfile, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  const [noAdminExists, setNoAdminExists] = useState(false);
+  const [makingAdmin, setMakingAdmin] = useState(false);
+
+  useEffect(() => {
+    checkAdminExists();
+  }, []);
+
+  const checkAdminExists = async () => {
+    const exists = await hasAnyAdmin();
+    setNoAdminExists(!exists);
+  };
+
+  const handleBecomeAdmin = async () => {
+    setMakingAdmin(true);
+    const success = await makeCurrentUserAdmin();
+    if (success) {
+      toast({
+        title: 'Admin access granted!',
+        description: 'You are now an admin. Refresh the page to see admin features.',
+      });
+      await refreshProfile();
+      setNoAdminExists(false);
+    } else {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to grant admin access',
+      });
+    }
+    setMakingAdmin(false);
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -146,11 +179,47 @@ export default function DashboardSettings() {
             </Card>
           </motion.div>
 
+          {/* Admin Setup - Only shown if no admin exists and user is not admin */}
+          {noAdminExists && !isAdmin && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+            >
+              <Card className="border-primary/50 bg-primary/5">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-primary">
+                    <Crown className="h-5 w-5" />
+                    Become Admin
+                  </CardTitle>
+                  <CardDescription>
+                    No admin exists yet. Claim admin access to manage the platform.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button onClick={handleBecomeAdmin} disabled={makingAdmin}>
+                    {makingAdmin ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Setting up...
+                      </>
+                    ) : (
+                      <>
+                        <Crown className="h-4 w-4 mr-2" />
+                        Become Admin
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
           {/* Security */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
+            transition={{ delay: 0.3 }}
           >
             <Card>
               <CardHeader>

@@ -17,7 +17,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { BOOKING_STATUS, SERVICE_CATEGORIES } from '@/lib/constants';
-import { Calendar, Clock, MapPin, User, DollarSign } from 'lucide-react';
+import { ReviewForm } from '@/components/reviews/ReviewForm';
+import { Calendar, Clock, MapPin, User, DollarSign, Star, MessageSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import type { Tables, Database } from '@/integrations/supabase/types';
@@ -29,6 +30,7 @@ interface BookingWithDetails extends Booking {
   service?: { title: string; image_url: string | null; category: string; location: string | null } | null;
   customerProfile?: { full_name: string; email: string } | null;
   providerProfile?: { full_name: string; email: string } | null;
+  hasReview?: boolean;
 }
 
 export default function DashboardBookings() {
@@ -37,6 +39,7 @@ export default function DashboardBookings() {
   const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
+  const [showReviewForm, setShowReviewForm] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -57,18 +60,23 @@ export default function DashboardBookings() {
         const serviceIds = [...new Set(bookingsData.map(b => b.service_id))];
         const customerIds = [...new Set(bookingsData.map(b => b.customer_id))];
         const providerIds = [...new Set(bookingsData.map(b => b.provider_id))];
+        const bookingIds = bookingsData.map(b => b.id);
 
-        const [servicesRes, customersRes, providersRes] = await Promise.all([
+        const [servicesRes, customersRes, providersRes, reviewsRes] = await Promise.all([
           supabase.from('services').select('id, title, image_url, category, location').in('id', serviceIds),
           supabase.from('profiles').select('id, full_name, email').in('id', customerIds),
           supabase.from('profiles').select('id, full_name, email').in('id', providerIds),
+          supabase.from('reviews').select('booking_id').in('booking_id', bookingIds),
         ]);
+
+        const reviewedBookingIds = new Set(reviewsRes.data?.map(r => r.booking_id) || []);
 
         const bookingsWithDetails = bookingsData.map(booking => ({
           ...booking,
           service: servicesRes.data?.find(s => s.id === booking.service_id) || null,
           customerProfile: customersRes.data?.find(p => p.id === booking.customer_id) || null,
           providerProfile: providersRes.data?.find(p => p.id === booking.provider_id) || null,
+          hasReview: reviewedBookingIds.has(booking.id),
         }));
 
         setBookings(bookingsWithDetails);
@@ -285,6 +293,41 @@ export default function DashboardBookings() {
                                         <SelectItem value="cancelled">Cancelled</SelectItem>
                                       </SelectContent>
                                     </Select>
+                                  </div>
+                                )}
+
+                                {/* Customer Review Option */}
+                                {!isProvider && booking.status === 'completed' && !booking.hasReview && (
+                                  <div className="pt-2">
+                                    {showReviewForm === booking.id ? (
+                                      <ReviewForm
+                                        bookingId={booking.id}
+                                        serviceId={booking.service_id}
+                                        providerId={booking.provider_id}
+                                        customerId={booking.customer_id}
+                                        onSuccess={() => {
+                                          setShowReviewForm(null);
+                                          fetchBookings();
+                                        }}
+                                      />
+                                    ) : (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setShowReviewForm(booking.id)}
+                                      >
+                                        <Star className="h-4 w-4 mr-2" />
+                                        Leave a Review
+                                      </Button>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Already Reviewed Badge */}
+                                {!isProvider && booking.status === 'completed' && booking.hasReview && (
+                                  <div className="pt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                                    <MessageSquare className="h-4 w-4" />
+                                    <span>You've reviewed this service</span>
                                   </div>
                                 )}
                               </div>
