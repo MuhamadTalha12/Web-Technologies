@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { ImageUpload } from '@/components/ui/image-upload';
 import {
   Select,
   SelectContent,
@@ -189,6 +190,18 @@ export default function DashboardServiceForm() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Service Image Upload */}
+                <div className="space-y-2">
+                  <Label>Service Image</Label>
+                  <ImageUpload
+                    bucket="service-images"
+                    userId={user.id}
+                    currentUrl={imageUrl}
+                    onUpload={setImageUrl}
+                    variant="cover"
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="title">Service Title</Label>
                   <Input
@@ -266,19 +279,6 @@ export default function DashboardServiceForm() {
                       onChange={(e) => setLocation(e.target.value)}
                     />
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="imageUrl">Image URL</Label>
-                  <Input
-                    id="imageUrl"
-                    placeholder="https://example.com/image.jpg"
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Add an image URL to make your service more appealing
-                  </p>
                 </div>
 
                 <div className="flex gap-4">

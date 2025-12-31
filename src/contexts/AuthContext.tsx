@@ -22,6 +22,7 @@ interface AuthContextType {
   isLoading: boolean;
   isProvider: boolean;
   isCustomer: boolean;
+  isAdmin: boolean;
   signUp: (email: string, password: string, fullName: string, role: UserRole) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -133,6 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isProvider = roles.includes('provider');
   const isCustomer = roles.includes('customer') || roles.length === 0;
+  const isAdmin = roles.includes('admin');
 
   return (
     <AuthContext.Provider
@@ -144,6 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isProvider,
         isCustomer,
+        isAdmin,
         signUp,
         signIn,
         signOut,

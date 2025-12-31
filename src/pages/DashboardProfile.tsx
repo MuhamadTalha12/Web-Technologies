@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ImageUpload } from '@/components/ui/image-upload';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -82,15 +82,6 @@ export default function DashboardProfile() {
     return <Navigate to="/login" replace />;
   }
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   return (
     <Layout>
       <div className="container py-8 max-w-2xl">
@@ -115,28 +106,16 @@ export default function DashboardProfile() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Avatar */}
-                <div className="flex items-center gap-6">
-                  <Avatar className="h-20 w-20">
-                    <AvatarImage src={avatarUrl || undefined} />
-                    <AvatarFallback className="bg-primary/10 text-primary text-xl">
-                      {fullName ? getInitials(fullName) : 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <Label htmlFor="avatarUrl">Avatar URL</Label>
-                    <div className="flex gap-2 mt-1">
-                      <Input
-                        id="avatarUrl"
-                        placeholder="https://example.com/avatar.jpg"
-                        value={avatarUrl}
-                        onChange={(e) => setAvatarUrl(e.target.value)}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Enter a URL to your profile picture
-                    </p>
-                  </div>
+                {/* Avatar Upload */}
+                <div className="space-y-2">
+                  <Label>Profile Photo</Label>
+                  <ImageUpload
+                    bucket="avatars"
+                    userId={user.id}
+                    currentUrl={avatarUrl}
+                    onUpload={setAvatarUrl}
+                    variant="avatar"
+                  />
                 </div>
 
                 <div className="grid gap-4">
