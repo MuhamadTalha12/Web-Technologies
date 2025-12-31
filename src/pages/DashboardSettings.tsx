@@ -6,11 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { User, Briefcase, LogOut, Shield, Bell, Palette } from 'lucide-react';
+import { User, Briefcase, LogOut, Shield, Bell, Palette, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function DashboardSettings() {
-  const { user, profile, isProvider, signOut, loading: authLoading } = useAuth();
+  const { user, profile, isProvider, signOut, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const handleSignOut = async () => {
@@ -25,7 +25,7 @@ export default function DashboardSettings() {
     return (
       <Layout>
         <div className="container py-8 flex items-center justify-center min-h-[50vh]">
-          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </Layout>
     );

@@ -40,8 +40,7 @@ export default function Signup() {
     setLoading(true);
 
     try {
-      const { error } = await signUp(email, password, fullName, role);
-      if (error) throw error;
+      await signUp(email, password, fullName, role);
       
       toast({
         title: 'Account created!',

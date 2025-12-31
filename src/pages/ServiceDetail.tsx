@@ -20,13 +20,13 @@ import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import type { Tables } from '@/integrations/supabase/types';
 
-type Service = Tables<'services'> & {
-  profiles?: { full_name: string; avatar_url: string | null; bio: string | null } | null;
-};
+type Service = Tables<'services'>;
+type Profile = Tables<'profiles'>;
+type Review = Tables<'reviews'>;
 
-type Review = Tables<'reviews'> & {
-  profiles?: { full_name: string; avatar_url: string | null } | null;
-};
+interface ReviewWithProfile extends Review {
+  customerProfile?: Profile | null;
+}
 
 export default function ServiceDetail() {
   const { id } = useParams<{ id: string }>();
@@ -35,7 +35,8 @@ export default function ServiceDetail() {
   const { toast } = useToast();
   
   const [service, setService] = useState<Service | null>(null);
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [provider, setProvider] = useState<Profile | null>(null);
+  const [reviews, setReviews] = useState<ReviewWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>();
@@ -51,14 +52,24 @@ export default function ServiceDetail() {
 
   const fetchService = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: serviceData, error: serviceError } = await supabase
         .from('services')
-        .select('*, profiles!services_provider_id_fkey(full_name, avatar_url, bio)')
+        .select('*')
         .eq('id', id)
         .maybeSingle();
 
-      if (error) throw error;
-      setService(data as Service);
+      if (serviceError) throw serviceError;
+      setService(serviceData);
+
+      if (serviceData) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', serviceData.provider_id)
+          .maybeSingle();
+        
+        setProvider(profileData);
+      }
     } catch (error) {
       console.error('Error fetching service:', error);
     } finally {
@@ -68,15 +79,30 @@ export default function ServiceDetail() {
 
   const fetchReviews = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: reviewsData, error } = await supabase
         .from('reviews')
-        .select('*, profiles:customer_id(full_name, avatar_url)')
+        .select('*')
         .eq('service_id', id)
         .order('created_at', { ascending: false })
         .limit(10);
 
       if (error) throw error;
-      setReviews((data as Review[]) || []);
+
+      // Fetch customer profiles for reviews
+      if (reviewsData && reviewsData.length > 0) {
+        const customerIds = reviewsData.map(r => r.customer_id);
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', customerIds);
+
+        const reviewsWithProfiles = reviewsData.map(review => ({
+          ...review,
+          customerProfile: profiles?.find(p => p.id === review.customer_id) || null,
+        }));
+        
+        setReviews(reviewsWithProfiles);
+      }
     } catch (error) {
       console.error('Error fetching reviews:', error);
     }
@@ -248,15 +274,15 @@ export default function ServiceDetail() {
               <CardContent>
                 <div className="flex items-start gap-4">
                   <Avatar className="h-16 w-16">
-                    <AvatarImage src={service.profiles?.avatar_url || undefined} />
+                    <AvatarImage src={provider?.avatar_url || undefined} />
                     <AvatarFallback className="bg-primary/10 text-primary text-lg">
-                      {service.profiles?.full_name?.[0] || 'P'}
+                      {provider?.full_name?.[0] || 'P'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
-                    <h4 className="font-semibold">{service.profiles?.full_name}</h4>
+                    <h4 className="font-semibold">{provider?.full_name}</h4>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {service.profiles?.bio || 'No bio available'}
+                      {provider?.bio || 'No bio available'}
                     </p>
                   </div>
                 </div>
@@ -277,13 +303,13 @@ export default function ServiceDetail() {
                       <div key={review.id} className="border-b border-border last:border-0 pb-4 last:pb-0">
                         <div className="flex items-center gap-3 mb-2">
                           <Avatar className="h-8 w-8">
-                            <AvatarImage src={review.profiles?.avatar_url || undefined} />
+                            <AvatarImage src={review.customerProfile?.avatar_url || undefined} />
                             <AvatarFallback>
                               <User className="h-4 w-4" />
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1">
-                            <p className="font-medium text-sm">{review.profiles?.full_name}</p>
+                            <p className="font-medium text-sm">{review.customerProfile?.full_name || 'Anonymous'}</p>
                             <div className="flex items-center gap-1">
                               {Array.from({ length: 5 }).map((_, i) => (
                                 <Star

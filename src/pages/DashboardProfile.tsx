@@ -10,11 +10,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Camera, Save } from 'lucide-react';
+import { Loader2, Save } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function DashboardProfile() {
-  const { user, profile, loading: authLoading, refreshProfile } = useAuth();
+  const { user, profile, isLoading: authLoading, refreshProfile } = useAuth();
   const { toast } = useToast();
   
   const [fullName, setFullName] = useState('');

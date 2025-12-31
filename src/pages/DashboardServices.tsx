@@ -27,7 +27,7 @@ import type { Tables } from '@/integrations/supabase/types';
 type Service = Tables<'services'>;
 
 export default function DashboardServices() {
-  const { user, isProvider, loading: authLoading } = useAuth();
+  const { user, isProvider, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +35,8 @@ export default function DashboardServices() {
   useEffect(() => {
     if (user && isProvider) {
       fetchServices();
+    } else {
+      setLoading(false);
     }
   }, [user, isProvider]);
 
