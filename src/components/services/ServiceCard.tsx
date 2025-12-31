@@ -33,7 +33,7 @@ export function ServiceCard({ service, index = 0 }: ServiceCardProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.1 }}
     >
-      <Link to={`/services/${service.id}`} className="block group">
+      <Link to={`/service/${service.id}`} className="block group">
         <div className="card-interactive overflow-hidden p-0">
           {/* Image */}
           <div className="relative h-48 overflow-hidden bg-muted">
