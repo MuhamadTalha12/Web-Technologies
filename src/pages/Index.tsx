@@ -86,20 +86,13 @@ export default function Index() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.05 }}
-                whileHover={{ y: -5, scale: 1.02 }}
               >
                 <Link
                   to={`/services?category=${category.value}`}
                   className="group flex flex-col items-center p-6 rounded-2xl border border-border bg-card hover:border-primary/30 hover:shadow-lg transition-all duration-300"
                 >
-                  <motion.span 
-                    className="text-4xl mb-3"
-                    whileHover={{ scale: 1.3, rotate: 10 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 10 }}
-                  >
-                    {category.icon}
-                  </motion.span>
-                  <span className="font-medium text-sm text-center group-hover:text-primary transition-colors">{category.label}</span>
+                  <span className="text-4xl mb-3 group-hover:scale-110 transition-transform">{category.icon}</span>
+                  <span className="font-medium text-sm text-center">{category.label}</span>
                 </Link>
               </motion.div>
             ))}

@@ -32,10 +32,9 @@ export function ServiceCard({ service, index = 0 }: ServiceCardProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.1 }}
-      whileHover={{ y: -8 }}
     >
       <Link to={`/service/${service.id}`} className="block group">
-        <div className="card-interactive overflow-hidden p-0 transition-all duration-300 group-hover:shadow-xl group-hover:border-primary/30">
+        <div className="card-interactive overflow-hidden p-0">
           {/* Image */}
           <div className="relative h-48 overflow-hidden bg-muted">
             {service.image_url ? (
@@ -45,18 +44,12 @@ export function ServiceCard({ service, index = 0 }: ServiceCardProps) {
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5 placeholder-shimmer">
-                <motion.span 
-                  className="text-5xl"
-                  whileHover={{ scale: 1.2, rotate: 10 }}
-                  transition={{ type: "spring", stiffness: 300 }}
-                >
-                  {category?.icon || '🔧'}
-                </motion.span>
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5">
+                <span className="text-5xl">{category?.icon || '🔧'}</span>
               </div>
             )}
             {/* Category Badge */}
-            <Badge className="absolute top-3 left-3 bg-background/90 text-foreground border-0 transition-transform duration-300 group-hover:scale-105">
+            <Badge className="absolute top-3 left-3 bg-background/90 text-foreground border-0">
               {category?.icon} {category?.label}
             </Badge>
           </div>
