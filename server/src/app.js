@@ -50,16 +50,21 @@ app.use(morgan('dev'));
 // Static uploads
 app.use(`/${env.uploadsDir}`, express.static(getUploadsRoot()));
 
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   const isHealth = req.path === '/api/health' || req.path === '/health';
   const isUploads = req.path.startsWith('/api/uploads') || req.path.startsWith(`/${env.uploadsDir}`);
   if (isHealth || isUploads) return next();
 
   const readyState = mongoose.connection.readyState;
   if (readyState !== 1) {
+    // On serverless, wait for the initial connection instead of endlessly returning 503.
+    await connectDb();
+  }
+
+  if (mongoose.connection.readyState !== 1) {
     return res.status(503).json({
       error: 'Database unavailable',
-      db: { readyState },
+      db: { readyState: mongoose.connection.readyState },
     });
   }
   return next();

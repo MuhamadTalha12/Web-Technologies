@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
+import { getDbDebugInfo } from '../lib/db.js';
 
 export const healthRouter = Router();
 
@@ -16,11 +17,15 @@ healthRouter.get('/health', (_req, res) => {
             ? 'disconnecting'
             : 'unknown';
 
+  const debug = getDbDebugInfo();
+
   res.json({
     ok: true,
     db: {
       readyState,
       state: stateLabel,
+      mongoUriSet: Boolean(process.env.MONGODB_URI),
+      lastError: debug.lastError,
     },
   });
 });
