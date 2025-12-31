@@ -15,7 +15,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export function Header() {
-  const { user, profile, isProvider, signOut } = useAuth();
+  const { user, profile, isProvider, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -115,6 +115,14 @@ export function Header() {
                     <Link to="/dashboard/services" className="cursor-pointer">
                       <Briefcase className="mr-2 h-4 w-4" />
                       My Services
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {isAdmin && (
+                  <DropdownMenuItem asChild>
+                    <Link to="/admin" className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Admin Panel
                     </Link>
                   </DropdownMenuItem>
                 )}

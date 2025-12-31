@@ -16,6 +16,7 @@ import DashboardServices from "./pages/DashboardServices";
 import DashboardServiceForm from "./pages/DashboardServiceForm";
 import DashboardBookings from "./pages/DashboardBookings";
 import DashboardSettings from "./pages/DashboardSettings";
+import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/dashboard/services/:id/edit" element={<DashboardServiceForm />} />
             <Route path="/dashboard/bookings" element={<DashboardBookings />} />
             <Route path="/dashboard/settings" element={<DashboardSettings />} />
+            <Route path="/admin" element={<AdminDashboard />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
