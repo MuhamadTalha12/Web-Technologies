@@ -13,7 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { BOOKING_STATUS, SERVICE_CATEGORIES } from '@/lib/constants';
@@ -21,10 +20,20 @@ import { ReviewForm } from '@/components/reviews/ReviewForm';
 import { Calendar, Clock, MapPin, User, DollarSign, Star, MessageSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import type { Tables, Database } from '@/integrations/supabase/types';
+import { api } from '@/lib/api';
 
-type BookingStatus = Database['public']['Enums']['booking_status'];
-type Booking = Tables<'bookings'>;
+type BookingStatus = 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+type Booking = {
+  id: string;
+  service_id: string;
+  provider_id: string;
+  customer_id: string;
+  scheduled_date: string | null;
+  scheduled_time: string | null;
+  total_price: number;
+  notes: string | null;
+  status: string;
+};
 
 interface BookingWithDetails extends Booking {
   service?: { title: string; image_url: string | null; category: string; location: string | null } | null;
@@ -49,40 +58,8 @@ export default function DashboardBookings() {
 
   const fetchBookings = async () => {
     try {
-      const { data: bookingsData, error } = await supabase
-        .from('bookings')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      if (bookingsData && bookingsData.length > 0) {
-        const serviceIds = [...new Set(bookingsData.map(b => b.service_id))];
-        const customerIds = [...new Set(bookingsData.map(b => b.customer_id))];
-        const providerIds = [...new Set(bookingsData.map(b => b.provider_id))];
-        const bookingIds = bookingsData.map(b => b.id);
-
-        const [servicesRes, customersRes, providersRes, reviewsRes] = await Promise.all([
-          supabase.from('services').select('id, title, image_url, category, location').in('id', serviceIds),
-          supabase.from('profiles').select('id, full_name, email').in('id', customerIds),
-          supabase.from('profiles').select('id, full_name, email').in('id', providerIds),
-          supabase.from('reviews').select('booking_id').in('booking_id', bookingIds),
-        ]);
-
-        const reviewedBookingIds = new Set(reviewsRes.data?.map(r => r.booking_id) || []);
-
-        const bookingsWithDetails = bookingsData.map(booking => ({
-          ...booking,
-          service: servicesRes.data?.find(s => s.id === booking.service_id) || null,
-          customerProfile: customersRes.data?.find(p => p.id === booking.customer_id) || null,
-          providerProfile: providersRes.data?.find(p => p.id === booking.provider_id) || null,
-          hasReview: reviewedBookingIds.has(booking.id),
-        }));
-
-        setBookings(bookingsWithDetails);
-      } else {
-        setBookings([]);
-      }
+      const data = await api<{ items: BookingWithDetails[] }>('/bookings', { method: 'GET' });
+      setBookings(data.items || []);
     } catch (error) {
       console.error('Error fetching bookings:', error);
     } finally {
@@ -92,12 +69,10 @@ export default function DashboardBookings() {
 
   const updateBookingStatus = async (bookingId: string, newStatus: BookingStatus) => {
     try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: newStatus })
-        .eq('id', bookingId);
-
-      if (error) throw error;
+      await api(`/bookings/${bookingId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatus }),
+      });
 
       setBookings((prev) =>
         prev.map((b) => (b.id === bookingId ? { ...b, status: newStatus } : b))

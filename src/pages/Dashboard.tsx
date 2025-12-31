@@ -5,15 +5,25 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { BOOKING_STATUS, SERVICE_CATEGORIES } from '@/lib/constants';
 import { Calendar, Briefcase, Star, Clock, ArrowRight, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import type { Tables } from '@/integrations/supabase/types';
+import { api } from '@/lib/api';
 
-type Booking = Tables<'bookings'>;
+type Booking = {
+  id: string;
+  service_id: string;
+  provider_id: string;
+  customer_id: string;
+  scheduled_date: string | null;
+  scheduled_time: string | null;
+  total_price: number;
+  notes: string | null;
+  status: string;
+  created_at?: string;
+};
 
 interface BookingWithDetails extends Booking {
   service?: { title: string; image_url: string | null; category: string } | null;
@@ -35,41 +45,17 @@ export default function Dashboard() {
 
   const fetchBookings = async () => {
     try {
-      const { data: bookingsData, error } = await supabase
-        .from('bookings')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5);
+      const data = await api<{ items: BookingWithDetails[] }>(`/bookings/recent?limit=5`, {
+        method: 'GET',
+      });
 
-      if (error) throw error;
-
-      // Fetch related data
-      if (bookingsData && bookingsData.length > 0) {
-        const serviceIds = [...new Set(bookingsData.map(b => b.service_id))];
-        const customerIds = [...new Set(bookingsData.map(b => b.customer_id))];
-        const providerIds = [...new Set(bookingsData.map(b => b.provider_id))];
-
-        const [servicesRes, customersRes, providersRes] = await Promise.all([
-          supabase.from('services').select('id, title, image_url, category').in('id', serviceIds),
-          supabase.from('profiles').select('id, full_name').in('id', customerIds),
-          supabase.from('profiles').select('id, full_name').in('id', providerIds),
-        ]);
-
-        const bookingsWithDetails = bookingsData.map(booking => ({
-          ...booking,
-          service: servicesRes.data?.find(s => s.id === booking.service_id) || null,
-          customerProfile: customersRes.data?.find(p => p.id === booking.customer_id) || null,
-          providerProfile: providersRes.data?.find(p => p.id === booking.provider_id) || null,
-        }));
-
-        setBookings(bookingsWithDetails);
-
-        setStats({
-          totalBookings: bookingsData.length,
-          pendingBookings: bookingsData.filter((b) => b.status === 'pending').length,
-          completedBookings: bookingsData.filter((b) => b.status === 'completed').length,
-        });
-      }
+      const items = data.items || [];
+      setBookings(items);
+      setStats({
+        totalBookings: items.length,
+        pendingBookings: items.filter((b) => b.status === 'pending').length,
+        completedBookings: items.filter((b) => b.status === 'completed').length,
+      });
     } catch (error) {
       console.error('Error fetching bookings:', error);
     } finally {

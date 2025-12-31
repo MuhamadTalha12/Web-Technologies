@@ -94,12 +94,18 @@ export function ServiceCard({ service, index = 0 }: ServiceCardProps) {
             <div className="flex items-center justify-between pt-3 border-t border-border">
               {/* Rating */}
               <div className="flex items-center gap-1.5">
-                <Star className="h-4 w-4 fill-warning text-warning" />
-                <span className="font-medium text-sm">
-                  {Number(service.rating).toFixed(1)}
+                <Star
+                  className={
+                    Number(service.rating ?? 0) > 0
+                      ? 'h-4 w-4 fill-warning text-warning transition-transform group-hover:scale-110'
+                      : 'h-4 w-4 text-muted-foreground transition-colors transition-transform group-hover:text-primary group-hover:scale-110'
+                  }
+                />
+                <span className="font-medium text-sm transition-colors group-hover:text-primary">
+                  {Number(service.rating ?? 0).toFixed(1)}
                 </span>
-                <span className="text-muted-foreground text-sm">
-                  ({service.total_reviews})
+                <span className="text-muted-foreground text-sm transition-colors group-hover:text-primary">
+                  ({Number(service.total_reviews ?? 0)})
                 </span>
               </div>
 

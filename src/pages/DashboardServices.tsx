@@ -16,16 +16,28 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { SERVICE_CATEGORIES } from '@/lib/constants';
 import { seedDemoServices } from '@/lib/demo-data';
 import { Plus, Edit, Trash2, Star, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
-import type { Tables } from '@/integrations/supabase/types';
+import { api } from '@/lib/api';
 
-type Service = Tables<'services'>;
+type Service = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  price: number;
+  duration_hours: number | null;
+  location: string | null;
+  image_url: string | null;
+  is_active: boolean;
+  rating: number | null;
+  total_reviews: number | null;
+  created_at?: string;
+};
 
 export default function DashboardServices() {
   const { user, isProvider, isLoading: authLoading } = useAuth();
@@ -44,14 +56,8 @@ export default function DashboardServices() {
 
   const fetchServices = async () => {
     try {
-      const { data, error } = await supabase
-        .from('services')
-        .select('*')
-        .eq('provider_id', user!.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setServices(data || []);
+      const data = await api<{ items: Service[] }>('/services/mine', { method: 'GET' });
+      setServices(data.items || []);
     } catch (error) {
       console.error('Error fetching services:', error);
     } finally {
@@ -85,12 +91,10 @@ export default function DashboardServices() {
 
   const toggleServiceStatus = async (serviceId: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from('services')
-        .update({ is_active: !currentStatus })
-        .eq('id', serviceId);
-
-      if (error) throw error;
+      await api(`/services/${serviceId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_active: !currentStatus }),
+      });
 
       setServices((prev) =>
         prev.map((s) => (s.id === serviceId ? { ...s, is_active: !currentStatus } : s))
@@ -113,9 +117,7 @@ export default function DashboardServices() {
 
   const deleteService = async (serviceId: string) => {
     try {
-      const { error } = await supabase.from('services').delete().eq('id', serviceId);
-
-      if (error) throw error;
+      await api(`/services/${serviceId}`, { method: 'DELETE' });
 
       setServices((prev) => prev.filter((s) => s.id !== serviceId));
 
@@ -244,7 +246,11 @@ export default function DashboardServices() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
                 >
-                  <Card className={`relative ${!service.is_active ? 'opacity-60' : ''}`}>
+                  <Card
+                    className={`relative group transition-colors hover:border-primary/40 ${
+                      !service.is_active ? 'opacity-60' : ''
+                    }`}
+                  >
                     {service.image_url && (
                       <div className="h-32 overflow-hidden rounded-t-lg">
                         <img
@@ -271,15 +277,19 @@ export default function DashboardServices() {
                         {service.description}
                       </p>
 
-                      {service.rating && service.rating > 0 && (
-                        <div className="flex items-center gap-1 text-sm mb-4">
-                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                          <span>{Number(service.rating).toFixed(1)}</span>
-                          <span className="text-muted-foreground">
-                            ({service.total_reviews} reviews)
-                          </span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1 text-sm mb-4 transition-colors group-hover:text-primary">
+                        <Star
+                          className={
+                            Number(service.rating ?? 0) > 0
+                              ? 'h-4 w-4 fill-yellow-400 text-yellow-400 transition-transform group-hover:scale-110'
+                              : 'h-4 w-4 text-muted-foreground transition-colors transition-transform group-hover:text-primary group-hover:scale-110'
+                          }
+                        />
+                        <span>{Number(service.rating ?? 0).toFixed(1)}</span>
+                        <span className="text-muted-foreground transition-colors group-hover:text-primary">
+                          ({Number(service.total_reviews ?? 0)} reviews)
+                        </span>
+                      </div>
 
                       <div className="flex gap-2">
                         <Button

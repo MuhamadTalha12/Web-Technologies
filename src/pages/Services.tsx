@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { ServiceCard } from '@/components/services/ServiceCard';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
 import { SERVICE_CATEGORIES, ITEMS_PER_PAGE } from '@/lib/constants';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -24,10 +23,22 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import type { Tables, Database } from '@/integrations/supabase/types';
+import { api } from '@/lib/api';
 
-type ServiceCategory = Database['public']['Enums']['service_category'];
-type Service = Tables<'services'>;
+type Service = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  price: number;
+  duration_hours: number | null;
+  location: string | null;
+  image_url: string | null;
+  is_active: boolean;
+  rating: number | null;
+  total_reviews: number | null;
+  created_at?: string;
+};
 
 export default function Services() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -48,40 +59,22 @@ export default function Services() {
   const fetchServices = async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('services')
-        .select('*', { count: 'exact' })
-        .eq('is_active', true);
-
-      if (searchQuery) {
-        query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+      const params = new URLSearchParams();
+      if (searchQuery) params.set('search', searchQuery);
+      if (category && SERVICE_CATEGORIES.some((c) => c.value === category)) {
+        params.set('category', category);
       }
+      params.set('sort', sortBy);
+      params.set('page', String(page));
+      params.set('limit', String(ITEMS_PER_PAGE));
 
-      if (category && SERVICE_CATEGORIES.some(c => c.value === category)) {
-        query = query.eq('category', category as ServiceCategory);
-      }
+      const data = await api<{ items: Service[]; total: number }>('/services?' + params.toString(), {
+        method: 'GET',
+        auth: false,
+      });
 
-      // Sorting
-      if (sortBy === 'price_asc') {
-        query = query.order('price', { ascending: true });
-      } else if (sortBy === 'price_desc') {
-        query = query.order('price', { ascending: false });
-      } else if (sortBy === 'rating') {
-        query = query.order('rating', { ascending: false, nullsFirst: false });
-      } else {
-        query = query.order('created_at', { ascending: false });
-      }
-
-      // Pagination
-      const from = (page - 1) * ITEMS_PER_PAGE;
-      const to = from + ITEMS_PER_PAGE - 1;
-      query = query.range(from, to);
-
-      const { data, error, count } = await query;
-
-      if (error) throw error;
-      setServices(data || []);
-      setTotalCount(count || 0);
+      setServices(data.items || []);
+      setTotalCount(data.total || 0);
     } catch (error) {
       console.error('Error fetching services:', error);
     } finally {
@@ -284,9 +277,7 @@ export default function Services() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <Link to={`/service/${service.id}`}>
-                  <ServiceCard service={service} />
-                </Link>
+                <ServiceCard service={service} />
               </motion.div>
             ))}
           </motion.div>

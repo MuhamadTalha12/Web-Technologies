@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 
 // Demo service data that will be inserted when a provider signs up
 export const DEMO_SERVICES = [
@@ -88,18 +88,19 @@ export const DEMO_SERVICES = [
 export async function seedDemoServices(providerId: string) {
   const servicesWithProvider = DEMO_SERVICES.map((service, index) => ({
     ...service,
-    provider_id: providerId,
     rating: 4.5 + Math.random() * 0.5, // Random rating between 4.5-5.0
     total_reviews: Math.floor(Math.random() * 50) + 5, // Random 5-55 reviews
     is_active: true,
   }));
 
-  const { error } = await supabase.from('services').insert(servicesWithProvider);
-  
-  if (error) {
+  try {
+    await api('/services/seed-demo', {
+      method: 'POST',
+      body: JSON.stringify({ demoServices: servicesWithProvider }),
+    });
+    return true;
+  } catch (error) {
     console.error('Error seeding services:', error);
     return false;
   }
-  
-  return true;
 }

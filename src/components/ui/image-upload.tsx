@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { supabase } from '@/integrations/supabase/client';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Upload, Loader2, X } from 'lucide-react';
+import { api } from '@/lib/api';
 
 interface ImageUploadProps {
   bucket: 'avatars' | 'service-images';
@@ -24,8 +25,52 @@ export function ImageUpload({
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(currentUrl || null);
+  const [urlInput, setUrlInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const applyUrl = (raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      toast({
+        variant: 'destructive',
+        title: 'Missing URL',
+        description: 'Paste an image URL',
+      });
+      return;
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid URL',
+        description: 'Please enter a valid http(s) URL',
+      });
+      return;
+    }
+
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid URL',
+        description: 'Only http(s) URLs are supported',
+      });
+      return;
+    }
+
+    setPreview(trimmed);
+    onUpload(trimmed);
+    setUrlInput('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    toast({
+      title: 'Image set',
+      description: 'Using the image URL you provided',
+    });
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -58,21 +103,18 @@ export function ImageUpload({
       const objectUrl = URL.createObjectURL(file);
       setPreview(objectUrl);
 
-      // Generate unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${userId}/${Date.now()}.${fileExt}`;
+      const form = new FormData();
+      form.append('bucket', bucket);
+      form.append('file', file);
 
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from(bucket)
-        .upload(fileName, file, { upsert: true });
+      const data = await api<{ url: string }>(`/uploads?bucket=${encodeURIComponent(bucket)}`,
+      {
+        method: 'POST',
+        body: form,
+      });
 
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
-      
-      onUpload(data.publicUrl);
+      // Server returns a relative URL like /uploads/...
+      onUpload(data.url);
       
       toast({
         title: 'Image uploaded',
@@ -94,6 +136,7 @@ export function ImageUpload({
   const handleRemove = () => {
     setPreview(null);
     onUpload('');
+    setUrlInput('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -155,6 +198,24 @@ export function ImageUpload({
               Remove
             </Button>
           )}
+
+          <div className="flex gap-2">
+            <Input
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              placeholder="Paste image URL (https://...)"
+              disabled={uploading}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => applyUrl(urlInput)}
+              disabled={uploading}
+            >
+              Use URL
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -226,6 +287,23 @@ export function ImageUpload({
           </>
         )}
       </Button>
+
+      <div className="flex gap-2">
+        <Input
+          value={urlInput}
+          onChange={(e) => setUrlInput(e.target.value)}
+          placeholder="Paste image URL (https://...)"
+          disabled={uploading}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => applyUrl(urlInput)}
+          disabled={uploading}
+        >
+          Use URL
+        </Button>
+      </div>
     </div>
   );
 }

@@ -11,18 +11,49 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { SERVICE_CATEGORIES } from '@/lib/constants';
 import { Star, MapPin, Clock, Calendar as CalendarIcon, ArrowLeft, User, ChevronRight, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import type { Tables } from '@/integrations/supabase/types';
+import { api } from '@/lib/api';
 
-type Service = Tables<'services'>;
-type Profile = Tables<'profiles'>;
-type Review = Tables<'reviews'>;
+type Service = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  price: number;
+  duration_hours: number | null;
+  location: string | null;
+  image_url: string | null;
+  is_active: boolean;
+  rating: number | null;
+  total_reviews: number | null;
+  provider_id: string;
+};
+
+type Profile = {
+  id: string;
+  email: string;
+  full_name: string;
+  avatar_url: string | null;
+  phone: string | null;
+  bio: string | null;
+  location: string | null;
+};
+
+type Review = {
+  id: string;
+  booking_id: string;
+  service_id: string;
+  provider_id: string;
+  customer_id: string;
+  rating: number;
+  comment: string | null;
+  created_at?: string;
+};
 
 interface ReviewWithProfile extends Review {
   customerProfile?: Profile | null;
@@ -52,24 +83,13 @@ export default function ServiceDetail() {
 
   const fetchService = async () => {
     try {
-      const { data: serviceData, error: serviceError } = await supabase
-        .from('services')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
+      const data = await api<{ service: Service; provider: Profile | null }>(`/services/${id}`, {
+        method: 'GET',
+        auth: false,
+      });
 
-      if (serviceError) throw serviceError;
-      setService(serviceData);
-
-      if (serviceData) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', serviceData.provider_id)
-          .maybeSingle();
-        
-        setProvider(profileData);
-      }
+      setService(data.service);
+      setProvider(data.provider);
     } catch (error) {
       console.error('Error fetching service:', error);
     } finally {
@@ -79,30 +99,11 @@ export default function ServiceDetail() {
 
   const fetchReviews = async () => {
     try {
-      const { data: reviewsData, error } = await supabase
-        .from('reviews')
-        .select('*')
-        .eq('service_id', id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-
-      // Fetch customer profiles for reviews
-      if (reviewsData && reviewsData.length > 0) {
-        const customerIds = reviewsData.map(r => r.customer_id);
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('*')
-          .in('id', customerIds);
-
-        const reviewsWithProfiles = reviewsData.map(review => ({
-          ...review,
-          customerProfile: profiles?.find(p => p.id === review.customer_id) || null,
-        }));
-        
-        setReviews(reviewsWithProfiles);
-      }
+      const data = await api<{ items: ReviewWithProfile[] }>(`/services/${id}/reviews?limit=10`, {
+        method: 'GET',
+        auth: false,
+      });
+      setReviews(data.items || []);
     } catch (error) {
       console.error('Error fetching reviews:', error);
     }
@@ -130,18 +131,15 @@ export default function ServiceDetail() {
 
     setBooking(true);
     try {
-      const { error } = await supabase.from('bookings').insert({
-        service_id: id!,
-        provider_id: service!.provider_id,
-        customer_id: user.id,
-        scheduled_date: format(selectedDate, 'yyyy-MM-dd'),
-        scheduled_time: selectedTime || null,
-        total_price: service!.price,
-        notes: notes || null,
-        status: 'pending',
+      await api('/bookings', {
+        method: 'POST',
+        body: JSON.stringify({
+          service_id: id!,
+          scheduled_date: format(selectedDate, 'yyyy-MM-dd'),
+          scheduled_time: selectedTime || null,
+          notes: notes || null,
+        }),
       });
-
-      if (error) throw error;
 
       toast({
         title: 'Booking submitted!',
@@ -239,12 +237,16 @@ export default function ServiceDetail() {
               <h1 className="font-display text-3xl md:text-4xl font-bold mb-4">{service.title}</h1>
               
               <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                {service.rating && service.rating > 0 && (
-                  <span className="flex items-center gap-1">
-                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    {service.rating} ({service.total_reviews} reviews)
-                  </span>
-                )}
+                <span className="flex items-center gap-1 group hover:text-primary transition-colors">
+                  <Star
+                    className={
+                      Number(service.rating ?? 0) > 0
+                        ? 'h-4 w-4 fill-yellow-400 text-yellow-400 transition-transform group-hover:scale-110'
+                        : 'h-4 w-4 text-muted-foreground transition-colors transition-transform group-hover:text-primary group-hover:scale-110'
+                    }
+                  />
+                  {Number(service.rating ?? 0).toFixed(1)} ({Number(service.total_reviews ?? 0)} reviews)
+                </span>
                 {service.location && (
                   <span className="flex items-center gap-1">
                     <MapPin className="h-4 w-4" />

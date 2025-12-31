@@ -7,11 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ImageUpload } from '@/components/ui/image-upload';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Save } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { api } from '@/lib/api';
 
 export default function DashboardProfile() {
   const { user, profile, isLoading: authLoading, refreshProfile } = useAuth();
@@ -39,18 +39,16 @@ export default function DashboardProfile() {
     setSaving(true);
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
+      await api('/users/me', {
+        method: 'PUT',
+        body: JSON.stringify({
           full_name: fullName,
           phone,
           location,
           bio,
           avatar_url: avatarUrl || null,
-        })
-        .eq('id', user!.id);
-
-      if (error) throw error;
+        }),
+      });
 
       await refreshProfile();
       toast({

@@ -14,15 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { SERVICE_CATEGORIES } from '@/lib/constants';
 import { Loader2, ArrowLeft, Save } from 'lucide-react';
 import { motion } from 'framer-motion';
-import type { Database } from '@/integrations/supabase/types';
+import { api } from '@/lib/api';
 
-type ServiceCategory = Database['public']['Enums']['service_category'];
+type ServiceCategory = string;
 
 export default function DashboardServiceForm() {
   const { id } = useParams<{ id: string }>();
@@ -50,16 +49,12 @@ export default function DashboardServiceForm() {
 
   const fetchService = async () => {
     try {
-      const { data, error } = await supabase
-        .from('services')
-        .select('*')
-        .eq('id', id)
-        .eq('provider_id', user!.id)
-        .maybeSingle();
+      const data = await api<{ service: any }>(`/services/${id}`, {
+        method: 'GET',
+        auth: false,
+      });
 
-      if (error) throw error;
-      
-      if (!data) {
+      if (!data?.service || data.service.provider_id !== user!.id) {
         toast({
           variant: 'destructive',
           title: 'Not found',
@@ -69,13 +64,13 @@ export default function DashboardServiceForm() {
         return;
       }
 
-      setTitle(data.title);
-      setDescription(data.description);
-      setCategory(data.category);
-      setPrice(data.price.toString());
-      setDurationHours(data.duration_hours?.toString() || '');
-      setLocation(data.location || '');
-      setImageUrl(data.image_url || '');
+      setTitle(data.service.title);
+      setDescription(data.service.description);
+      setCategory(data.service.category);
+      setPrice(String(data.service.price));
+      setDurationHours(data.service.duration_hours ? String(data.service.duration_hours) : '');
+      setLocation(data.service.location || '');
+      setImageUrl(data.service.image_url || '');
     } catch (error) {
       console.error('Error fetching service:', error);
     } finally {
@@ -106,25 +101,23 @@ export default function DashboardServiceForm() {
         duration_hours: durationHours ? parseInt(durationHours) : null,
         location: location || null,
         image_url: imageUrl || null,
-        provider_id: user!.id,
       };
 
       if (isEditing) {
-        const { error } = await supabase
-          .from('services')
-          .update(serviceData)
-          .eq('id', id);
-
-        if (error) throw error;
+        await api(`/services/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(serviceData),
+        });
 
         toast({
           title: 'Service updated',
           description: 'Your service has been successfully updated.',
         });
       } else {
-        const { error } = await supabase.from('services').insert(serviceData);
-
-        if (error) throw error;
+        await api(`/services`, {
+          method: 'POST',
+          body: JSON.stringify(serviceData),
+        });
 
         toast({
           title: 'Service created',

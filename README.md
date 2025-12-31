@@ -1,5 +1,43 @@
 # Welcome to your Lovable project
 
+## Running with MongoDB (MERN)
+
+This repo now includes an Express + MongoDB backend in `server/`.
+
+### 1) Start MongoDB
+
+- Ensure MongoDB is running locally (or use MongoDB Atlas).
+
+If you're using MongoDB Atlas, make sure your current IP is allowed under **Atlas → Security → Network Access** (for quick local dev you can temporarily allow `0.0.0.0/0`).
+
+### 2) Start the API server
+
+```sh
+cd server
+copy .env.example .env
+npm i
+npm run dev
+```
+
+By default the server runs on `http://localhost:5000`.
+
+You can verify the API is reachable at `http://localhost:5000/api/health` (it also reports whether the DB is connected).
+
+If you keep Vite on port `8080`, set `CLIENT_ORIGIN` in `server/.env` to:
+
+```env
+CLIENT_ORIGIN=http://localhost:8080
+```
+
+### 3) Start the React client
+
+```sh
+npm i
+npm run dev
+```
+
+Vite proxies `/api` and `/uploads` to the backend during development.
+
 ## Project info
 
 **URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID

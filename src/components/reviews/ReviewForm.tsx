@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Star, Loader2, Send } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { api } from '@/lib/api';
 
 interface ReviewFormProps {
   bookingId: string;
@@ -27,16 +27,17 @@ export function ReviewForm({ bookingId, serviceId, providerId, customerId, onSuc
     setSubmitting(true);
 
     try {
-      const { error } = await supabase.from('reviews').insert({
-        booking_id: bookingId,
-        service_id: serviceId,
-        provider_id: providerId,
-        customer_id: customerId,
-        rating,
-        comment: comment || null,
+      await api('/reviews', {
+        method: 'POST',
+        body: JSON.stringify({
+          booking_id: bookingId,
+          service_id: serviceId,
+          provider_id: providerId,
+          customer_id: customerId,
+          rating,
+          comment: comment || null,
+        }),
       });
-
-      if (error) throw error;
 
       toast({
         title: 'Review submitted!',

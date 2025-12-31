@@ -24,17 +24,40 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { SERVICE_CATEGORIES } from '@/lib/constants';
 import { Users, Briefcase, Settings, Star, Trash2, Shield, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
-import type { Tables, Database } from '@/integrations/supabase/types';
+type AppRole = 'customer' | 'provider' | 'admin';
 
-type AppRole = Database['public']['Enums']['app_role'];
-type Service = Tables<'services'>;
-type Profile = Tables<'profiles'>;
+type Service = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  price: number;
+  duration_hours: number | null;
+  location: string | null;
+  image_url: string | null;
+  is_active: boolean;
+  rating: number | null;
+  total_reviews: number | null;
+  provider_id: string;
+  created_at?: string;
+};
+
+type Profile = {
+  id: string;
+  email: string;
+  full_name: string;
+  avatar_url: string | null;
+  phone: string | null;
+  bio: string | null;
+  location: string | null;
+  created_at?: string;
+};
 
 interface UserWithRoles extends Profile {
   roles: AppRole[];
@@ -60,33 +83,11 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       if (activeTab === 'users') {
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (profilesError) throw profilesError;
-
-        const { data: allRoles, error: rolesError } = await supabase
-          .from('user_roles')
-          .select('user_id, role');
-
-        if (rolesError) throw rolesError;
-
-        const usersWithRoles = (profiles || []).map(profile => ({
-          ...profile,
-          roles: allRoles?.filter(r => r.user_id === profile.id).map(r => r.role) || [],
-        }));
-
-        setUsers(usersWithRoles);
+        const data = await api<{ items: UserWithRoles[] }>('/admin/users', { method: 'GET' });
+        setUsers(data.items || []);
       } else if (activeTab === 'services') {
-        const { data, error } = await supabase
-          .from('services')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        setServices(data || []);
+        const data = await api<{ items: Service[] }>('/admin/services', { method: 'GET' });
+        setServices(data.items || []);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -98,17 +99,15 @@ export default function AdminDashboard() {
   const updateUserRole = async (userId: string, newRole: AppRole, add: boolean) => {
     try {
       if (add) {
-        const { error } = await supabase
-          .from('user_roles')
-          .insert({ user_id: userId, role: newRole });
-        if (error) throw error;
+        await api(`/admin/users/${userId}/roles`, {
+          method: 'POST',
+          body: JSON.stringify({ role: newRole }),
+        });
       } else {
-        const { error } = await supabase
-          .from('user_roles')
-          .delete()
-          .eq('user_id', userId)
-          .eq('role', newRole);
-        if (error) throw error;
+        await api(`/admin/users/${userId}/roles`, {
+          method: 'DELETE',
+          body: JSON.stringify({ role: newRole }),
+        });
       }
 
       toast({
@@ -127,12 +126,10 @@ export default function AdminDashboard() {
 
   const toggleServiceStatus = async (serviceId: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from('services')
-        .update({ is_active: !currentStatus })
-        .eq('id', serviceId);
-
-      if (error) throw error;
+      await api(`/services/${serviceId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_active: !currentStatus }),
+      });
 
       setServices(prev =>
         prev.map(s => (s.id === serviceId ? { ...s, is_active: !currentStatus } : s))
@@ -152,8 +149,7 @@ export default function AdminDashboard() {
 
   const deleteService = async (serviceId: string) => {
     try {
-      const { error } = await supabase.from('services').delete().eq('id', serviceId);
-      if (error) throw error;
+      await api(`/services/${serviceId}`, { method: 'DELETE' });
 
       setServices(prev => prev.filter(s => s.id !== serviceId));
       toast({ title: 'Service deleted' });
@@ -303,7 +299,7 @@ export default function AdminDashboard() {
                       {users.map(userItem => (
                         <div
                           key={userItem.id}
-                          className="flex items-center justify-between p-4 rounded-xl border border-border"
+                          className="flex items-center justify-between p-4 rounded-xl border border-border transition-colors hover:bg-muted/40"
                         >
                           <div>
                             <p className="font-medium">{userItem.full_name}</p>
@@ -369,7 +365,7 @@ export default function AdminDashboard() {
                         return (
                           <div
                             key={service.id}
-                            className={`flex items-center justify-between p-4 rounded-xl border border-border ${
+                            className={`flex items-center justify-between p-4 rounded-xl border border-border transition-colors hover:bg-muted/40 ${
                               !service.is_active ? 'opacity-60' : ''
                             }`}
                           >
