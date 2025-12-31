@@ -4,6 +4,12 @@ export type ApiErrorBody = {
   details?: unknown;
 };
 
+function getApiBaseUrl(): string {
+  const raw = (import.meta as any).env?.VITE_API_URL as string | undefined;
+  if (!raw) return '';
+  return raw.replace(/\/$/, '');
+}
+
 const TOKEN_KEY = 'lc_token';
 
 export function getAuthToken(): string | null {
@@ -35,8 +41,9 @@ export async function api<T>(
 ): Promise<T> {
   const { auth = true, headers, ...rest } = options;
   const token = getAuthToken();
+  const baseUrl = getApiBaseUrl();
 
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${baseUrl}/api${path}`, {
     ...rest,
     headers: {
       ...(headers || {}),

@@ -11,6 +11,23 @@ export const uploadsRouter = Router();
 
 const maxBytes = env.maxUploadMb * 1024 * 1024;
 
+function isVercel() {
+  return process.env.VERCEL === '1' || process.env.VERCEL === 'true';
+}
+
+function getUploadsRoot() {
+  // Vercel serverless: only /tmp is writable, and it's ephemeral.
+  if (isVercel()) return path.join('/tmp', env.uploadsDir);
+  return path.join(process.cwd(), env.uploadsDir);
+}
+
+function getRequestBaseUrl(req) {
+  const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'http').toString();
+  const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toString();
+  if (!host) return '';
+  return `${proto}://${host}`;
+}
+
 function getBucket(req) {
   const fromQuery = req.query?.bucket;
   const fromHeader = req.headers['x-upload-bucket'];
@@ -38,7 +55,7 @@ const storage = multer.diskStorage({
     if (!['avatars', 'service-images'].includes(bucket)) return cb(badRequest('Invalid bucket'));
 
     const userId = req.auth.userId;
-    const dest = path.join(process.cwd(), env.uploadsDir, bucket, userId);
+    const dest = path.join(getUploadsRoot(), bucket, userId);
     fs.mkdirSync(dest, { recursive: true });
     cb(null, dest);
   },
@@ -73,6 +90,7 @@ uploadsRouter.post(
 
     const bucket = getBucket(req);
     const rel = `/${env.uploadsDir}/${bucket}/${req.auth.userId}/${req.file.filename}`;
-    res.status(201).json({ url: rel });
+    const base = getRequestBaseUrl(req);
+    res.status(201).json({ url: base ? `${base}${rel}` : rel });
   })
 );
